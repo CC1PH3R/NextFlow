@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import Link from "next/link";
 
@@ -34,7 +35,19 @@ export default async function DebugSessionPage() {
         },
       })
     : null;
-  const membership = session ? await caller.dev.workspace.get() : null;
+  let membership = null;
+  if (session) {
+    try {
+      membership = await caller.dev.workspace.get();
+    } catch (error) {
+      if (
+        !(error instanceof TRPCError) ||
+        (error.code !== "UNAUTHORIZED" && error.code !== "FORBIDDEN")
+      ) {
+        throw error;
+      }
+    }
+  }
 
   return (
     <main className="relative mx-auto flex min-h-svh w-full max-w-xl flex-col justify-center gap-6 p-8">

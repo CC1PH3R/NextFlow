@@ -20,11 +20,9 @@ export default async function DashboardPage() {
           <Badge variant={health.ok ? "secondary" : "destructive"}>
             API {health.ok ? "ok" : "down"}
           </Badge>
-          {membership ? (
-            <Badge variant="outline">
-              {membership.workspace.slug} · {membership.role}
-            </Badge>
-          ) : null}
+          <Badge variant="outline">
+            {membership.workspace.slug} · {membership.role}
+          </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
           Connected Next.js sites will show up here.

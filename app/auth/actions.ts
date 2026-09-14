@@ -19,7 +19,7 @@ export async function signInWithGitHubToSession() {
 }
 
 export async function signOutSession() {
-  await signOut({ redirectTo: "/dashboard" });
+  await signOut({ redirectTo: "/" });
 }
 
 export async function signOutToSession() {

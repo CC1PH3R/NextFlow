@@ -1,14 +1,20 @@
-import { signInWithGitHub, signOutSession } from "@/app/auth/actions";
+import { redirect } from "next/navigation";
+
+import { signOutSession } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { auth, githubAuthEnabled } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 
 export default async function DashboardLayout({
   children,
 }: LayoutProps<"/dashboard">) {
   const session = await auth();
+
+  if (!session?.userId) {
+    redirect("/");
+  }
 
   return (
     <div className="min-h-svh bg-background">
@@ -17,19 +23,11 @@ export default async function DashboardLayout({
         <Badge variant="secondary">Private</Badge>
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
-          {session ? (
-            <form action={signOutSession}>
-              <Button type="submit" variant="ghost" size="sm">
-                Sign out
-              </Button>
-            </form>
-          ) : githubAuthEnabled ? (
-            <form action={signInWithGitHub}>
-              <Button type="submit" size="sm">
-                Sign in with GitHub
-              </Button>
-            </form>
-          ) : null}
+          <form action={signOutSession}>
+            <Button type="submit" variant="ghost" size="sm">
+              Sign out
+            </Button>
+          </form>
         </div>
       </header>
       <Separator />
