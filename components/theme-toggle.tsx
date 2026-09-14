@@ -34,16 +34,15 @@ export function ThemeToggle() {
 
   const current =
     options.find((option) => option.value === theme) ?? options[2];
-  const CurrentIcon = current.icon;
+  const CurrentIcon = mounted ? current.icon : Monitor;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="outline" size="sm" />}
-        aria-label="Select color theme"
+        render={<Button variant="ghost" size="icon-sm" />}
+        aria-label="Color theme"
       >
         <CurrentIcon />
-        {mounted ? current.label : "Theme"}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup

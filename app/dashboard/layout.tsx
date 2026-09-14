@@ -15,10 +15,11 @@ export default async function DashboardLayout({
       <header className="flex h-14 items-center gap-3 px-6">
         <p className="font-heading text-sm font-medium">NextFlow</p>
         <Badge variant="secondary">Private</Badge>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
           {session ? (
             <form action={signOutSession}>
-              <Button type="submit" variant="outline" size="sm">
+              <Button type="submit" variant="ghost" size="sm">
                 Sign out
               </Button>
             </form>
@@ -29,7 +30,6 @@ export default async function DashboardLayout({
               </Button>
             </form>
           ) : null}
-          <ThemeToggle />
         </div>
       </header>
       <Separator />
