@@ -12,13 +12,19 @@ export default function Home() {
         NextFlow
       </h1>
       <p className="text-muted-foreground">
-        Dashboard for managing Next.js sites
+        Dashboard for managing multiple Next.js sites
       </p>
       <Link
         href="/dashboard"
         className="text-sm font-medium underline-offset-4 hover:underline"
       >
         Open dashboard
+      </Link>
+      <Link
+        href="/debug/session"
+        className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        Session debug
       </Link>
     </main>
   );
