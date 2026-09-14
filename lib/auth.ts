@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import GitHub, { type GitHubProfile } from "next-auth/providers/github";
 
 import { upsertDevUser } from "@/lib/auth/upsert-dev-user";
+import { bootstrapWorkspace } from "@/lib/auth/bootstrap-workspace";
 import { env } from "@/lib/env";
 
 declare module "next-auth" {
@@ -69,6 +70,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: profile.name ?? profile.login,
           avatarUrl: profile.avatar_url,
         });
+
+        await bootstrapWorkspace(dbUser.id);
 
         token.userId = dbUser.id;
         token.tier = dbUser.tier;

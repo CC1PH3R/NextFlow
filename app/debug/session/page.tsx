@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth, githubAuthEnabled } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { caller } from "@/lib/trpc/server";
 
 function sessionPayload(session: Session) {
   return {
@@ -33,6 +34,7 @@ export default async function DebugSessionPage() {
         },
       })
     : null;
+  const membership = session ? await caller.dev.workspace.get() : null;
 
   return (
     <main className="relative mx-auto flex min-h-svh w-full max-w-xl flex-col justify-center gap-6 p-8">
@@ -79,6 +81,20 @@ export default async function DebugSessionPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">
                   No matching row. Sign out and sign in with GitHub.
+                </p>
+              )}
+            </div>
+          ) : null}
+          {session ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">workspace</p>
+              {membership ? (
+                <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs">
+                  {JSON.stringify(membership, null, 2)}
+                </pre>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Signed in, but not a workspace member.
                 </p>
               )}
             </div>

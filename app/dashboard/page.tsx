@@ -5,7 +5,10 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components
 import { caller } from "@/lib/trpc/server";
 
 export default async function DashboardPage() {
-  const health = await caller.dev.health();
+  const [health, membership] = await Promise.all([
+    caller.dev.health(),
+    caller.dev.workspace.get(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -17,6 +20,11 @@ export default async function DashboardPage() {
           <Badge variant={health.ok ? "secondary" : "destructive"}>
             API {health.ok ? "ok" : "down"}
           </Badge>
+          {membership ? (
+            <Badge variant="outline">
+              {membership.workspace.slug} · {membership.role}
+            </Badge>
+          ) : null}
         </div>
         <p className="text-sm text-muted-foreground">
           Connected Next.js sites will show up here.
