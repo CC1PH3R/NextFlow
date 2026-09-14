@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserTier {
+  dev
+  casual
+}
+
+enum WorkspaceRole {
+  owner
+  dev
+}
+
+enum HostProvider {
+  vercel
+}
+
+enum GitHubAccountType {
+  User
+  Organization
+}
+
+model User {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String    @unique @db.VarChar(255)
+  name           String?   @db.VarChar(255)
+  avatarUrl      String?   @map("avatar_url") @db.VarChar(500)
+  githubId       Int?      @unique @map("github_id")
+  githubUsername String?   @map("github_username") @db.VarChar(100)
+  passwordHash   String?   @map("password_hash")
+  tier           UserTier
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  ownedWorkspaces Workspace[]        @relation("WorkspaceOwner")
+  memberships     WorkspaceMember[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(100)
+  ownerId   String   @map("owner_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner               User                 @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members             WorkspaceMember[]
+  githubInstallations GitHubInstallation[]
+  sites               Site[]
+  hostConnections     HostConnection[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  role        WorkspaceRole @default(dev)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model GitHubInstallation {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String             @map("workspace_id") @db.Uuid
+  installationId BigInt             @unique @map("installation_id")
+  accountLogin   String             @map("account_login") @db.VarChar(100)
+  accountType    GitHubAccountType  @map("account_type")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sites     Site[]
+
+  @@map("github_installations")
+}
+
+model Site {
+  id                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId          String       @map("workspace_id") @db.Uuid
+  name                 String       @db.VarChar(255)
+  slug                 String       @db.VarChar(100)
+  githubInstallationId String       @map("github_installation_id") @db.Uuid
+  githubRepoOwner      String       @map("github_repo_owner") @db.VarChar(100)
+  githubRepoName       String       @map("github_repo_name") @db.VarChar(100)
+  githubDefaultBranch  String       @default("main") @map("github_default_branch") @db.VarChar(100)
+  hostProvider         HostProvider @map("host_provider")
+  hostProjectId        String?      @map("host_project_id") @db.VarChar(100)
+  hostRevalidateUrl    String?      @map("host_revalidate_url") @db.VarChar(500)
+  hostDeployHookUrl    String?      @map("host_deploy_hook_url") @db.VarChar(500)
+  mediaFolder          String?      @map("media_folder") @db.VarChar(200)
+  customDomain         String?      @map("custom_domain") @db.VarChar(255)
+  settings             Json         @default("{}")
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  githubInstallation GitHubInstallation @relation(fields: [githubInstallationId], references: [id])
+
+  @@unique([workspaceId, slug])
+  @@unique([githubRepoOwner, githubRepoName])
+  @@map("sites")
+}
+
+model HostConnection {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String       @map("workspace_id") @db.Uuid
+  provider        HostProvider
+  accessTokenEnc  String       @map("access_token_enc")
+  refreshTokenEnc String?      @map("refresh_token_enc")
+  meta            Json         @default("{}")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
+  @@map("host_connections")
+}
