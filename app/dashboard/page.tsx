@@ -1,14 +1,23 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { caller } from "@/lib/trpc/server";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const health = await caller.dev.health();
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-medium tracking-tight">
-          Dashboard
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="font-heading text-2xl font-medium tracking-tight">
+            Dashboard
+          </h1>
+          <Badge variant={health.ok ? "secondary" : "destructive"}>
+            API {health.ok ? "ok" : "down"}
+          </Badge>
+        </div>
         <p className="text-sm text-muted-foreground">
           Connected Next.js sites will show up here.
         </p>
