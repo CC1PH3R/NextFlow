@@ -1,12 +1,13 @@
 import type { Session } from "next-auth";
 import Link from "next/link";
 
-import { debugSignIn, debugSignOut } from "@/app/debug/session/actions";
+import { signInWithGitHubToSession, signOutToSession } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { auth, debugSignInEnabled } from "@/lib/auth";
+import { auth, githubAuthEnabled } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 function sessionPayload(session: Session) {
   return {
@@ -18,6 +19,20 @@ function sessionPayload(session: Session) {
 
 export default async function DebugSessionPage() {
   const session = await auth();
+  const dbUser = session?.userId
+    ? await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          avatarUrl: true,
+          githubId: true,
+          githubUsername: true,
+          tier: true,
+        },
+      })
+    : null;
 
   return (
     <main className="relative mx-auto flex min-h-svh w-full max-w-xl flex-col justify-center gap-6 p-8">
@@ -29,7 +44,8 @@ export default async function DebugSessionPage() {
           Session
         </h1>
         <p className="text-sm text-muted-foreground">
-          Debug readout for Auth.js. GitHub sign-in is the next milestone.
+          GitHub OAuth is identity only. The access token is discarded after
+          profile + email are read.
         </p>
       </div>
       <Card>
@@ -42,11 +58,10 @@ export default async function DebugSessionPage() {
           </CardTitle>
           <CardDescription>
             Payload is <code>userId</code> and <code>tier</code> only.{" "}
-            <code>expires</code> is the Auth.js idle timeout. Tokens never
-            belong here.
+            <code>expires</code> is the Auth.js idle timeout.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {session ? (
             <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs">
               {JSON.stringify(sessionPayload(session), null, 2)}
@@ -54,21 +69,36 @@ export default async function DebugSessionPage() {
           ) : (
             <p className="text-sm">signed out</p>
           )}
+          {session ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">users row</p>
+              {dbUser ? (
+                <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs">
+                  {JSON.stringify(dbUser, null, 2)}
+                </pre>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No matching row. Sign out and sign in with GitHub.
+                </p>
+              )}
+            </div>
+          ) : null}
         </CardContent>
         <CardFooter className="gap-2">
           {session ? (
-            <form action={debugSignOut}>
+            <form action={signOutToSession}>
               <Button type="submit" variant="outline">
                 Sign out
               </Button>
             </form>
-          ) : debugSignInEnabled ? (
-            <form action={debugSignIn}>
-              <Button type="submit">Sign in (debug)</Button>
+          ) : githubAuthEnabled ? (
+            <form action={signInWithGitHubToSession}>
+              <Button type="submit">Sign in with GitHub</Button>
             </form>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Debug sign-in is disabled in production.
+              Add <code>AUTH_GITHUB_ID</code> and <code>AUTH_GITHUB_SECRET</code>{" "}
+              to <code>.env.local</code>, then restart <code>npm run dev</code>.
             </p>
           )}
         </CardFooter>

@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+import GitHub, { type GitHubProfile } from "next-auth/providers/github";
 
+import { upsertDevUser } from "@/lib/auth/upsert-dev-user";
 import { env } from "@/lib/env";
 
 declare module "next-auth" {
@@ -16,13 +17,22 @@ declare module "next-auth" {
 
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
 
-// Debug user for the session page
-const debugUser = {
-  id: "00000000-0000-0000-0000-000000000001",
-  tier: "dev" as const,
-};
+export const githubAuthEnabled = Boolean(
+  env.AUTH_GITHUB_ID && env.AUTH_GITHUB_SECRET,
+);
 
-export const debugSignInEnabled = process.env.NODE_ENV !== "production";
+function isGitHubProfile(profile: unknown): profile is GitHubProfile {
+  if (!profile || typeof profile !== "object") {
+    return false;
+  }
+
+  return (
+    "id" in profile &&
+    typeof profile.id === "number" &&
+    "login" in profile &&
+    typeof profile.login === "string"
+  );
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: env.AUTH_SECRET,
@@ -34,24 +44,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/debug/session",
   },
-  providers: debugSignInEnabled
+  providers: githubAuthEnabled
     ? [
-        Credentials({
-          id: "dev-debug",
-          name: "Debug",
-          credentials: {},
-          authorize() {
-            return debugUser;
+        GitHub({
+          clientId: env.AUTH_GITHUB_ID,
+          clientSecret: env.AUTH_GITHUB_SECRET,
+          authorization: {
+            params: { scope: "read:user user:email" },
           },
         }),
       ]
     : [],
   callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.userId = user.id;
-        token.tier = user.tier;
+    async jwt({ token, account, profile }) {
+      if (account?.provider === "github" && isGitHubProfile(profile)) {
+        if (!profile.email) {
+          throw new Error("GitHub did not return an email for this account.");
+        }
+
+        const dbUser = await upsertDevUser({
+          githubId: profile.id,
+          githubUsername: profile.login,
+          email: profile.email,
+          name: profile.name ?? profile.login,
+          avatarUrl: profile.avatar_url,
+        });
+
+        token.userId = dbUser.id;
+        token.tier = dbUser.tier;
       }
+
       return token;
     },
     session({ session, token }) {

@@ -24,7 +24,7 @@ export default function Home() {
         href="/debug/session"
         className="text-sm text-muted-foreground underline-offset-4 hover:underline"
       >
-        Session debug
+        Sign in
       </Link>
     </main>
   );
