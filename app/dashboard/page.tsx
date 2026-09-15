@@ -2,12 +2,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { githubAppEnabled } from "@/lib/github/app";
 import { caller } from "@/lib/trpc/server";
 
 export default async function DashboardPage() {
-  const [health, membership] = await Promise.all([
+  const [health, membership, installations] = await Promise.all([
     caller.dev.health(),
     caller.dev.workspace.get(),
+    caller.dev.github.installations.list(),
   ]);
 
   return (
@@ -28,6 +30,48 @@ export default async function DashboardPage() {
           Connected Next.js sites will show up here.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>GitHub App</CardTitle>
+          <CardDescription>
+            Repo access is the App install, not the login you used to sign in.
+          </CardDescription>
+          <CardAction>
+            {githubAppEnabled ? (
+              <Button nativeButton={false} render={<a href="/api/github/install" />}>
+                {installations.length > 0
+                  ? "Add or update install"
+                  : "Install GitHub App"}
+              </Button>
+            ) : (
+              <Button variant="outline" disabled>
+                Install GitHub App
+              </Button>
+            )}
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {installations.length > 0 ? (
+            <ul className="space-y-1 text-sm">
+              {installations.map((installation) => (
+                <li key={installation.id}>
+                  {installation.accountLogin}{" "}
+                  <span className="text-muted-foreground">
+                    ({installation.accountType}) · {installation.installationId}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {githubAppEnabled
+                ? "No installation yet. Install on one private repo."
+                : "Add GITHUB_APP_ID, GITHUB_APP_SLUG, and GITHUB_APP_PRIVATE_KEY to .env.local, then restart."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
