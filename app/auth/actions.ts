@@ -13,3 +13,6 @@ export async function signInWithGitHub() {
 export async function signOutSession() {
   await signOut({ redirectTo: "/" });
 }
+
+export { signInWithGitHub as signInWithGitHubToSession };
+export { signOutSession as signOutToSession };
