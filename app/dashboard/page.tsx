@@ -1,3 +1,4 @@
+import { AddMemberForm } from "@/components/add-member-form";
 import { ConnectSiteForm } from "@/components/connect-site-form";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,11 +8,14 @@ import { caller } from "@/lib/trpc/server";
 export default async function DashboardPage() {
   await requireDevAccess();
 
-  const [sites, installations, vercelConnection] = await Promise.all([
+  const [membership, sites, installations, vercelConnection] = await Promise.all([
+    caller.dev.workspace.get(),
     caller.dev.sites.list(),
     caller.dev.github.installations.list(),
     caller.dev.hosts.vercel.connected(),
   ]);
+  const members =
+    membership.role === "owner" ? await caller.dev.workspace.listMembers() : [];
 
   const githubReady = installations.length > 0;
   const vercelReady = vercelConnection.connected;
@@ -132,6 +136,29 @@ export default async function DashboardPage() {
       ) : null}
       {canConnect ? (
         <ConnectSiteForm repos={availableRepos} projects={projects} />
+      ) : null}
+
+      {membership.role === "owner" ? (
+        <div className="space-y-4 border-t pt-6">
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium">Team</h2>
+            <ul className="text-sm">
+              {members.map((member) => (
+                <li key={member.id}>
+                  {member.githubUsername ?? member.name ?? "dev"} · {member.role}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium">Add a teammate</h2>
+            <p className="text-sm text-muted-foreground">
+              They sign in with GitHub once first. Then add their username here.
+              They do not reinstall the GitHub App or reconnect Vercel.
+            </p>
+            <AddMemberForm />
+          </div>
+        </div>
       ) : null}
     </div>
   );

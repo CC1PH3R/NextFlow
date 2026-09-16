@@ -41,6 +41,92 @@ const devRouter = createTRPCRouter({
         githubUsername: ctx.user.githubUsername,
       },
     })),
+    listMembers: devProcedure.query(async ({ ctx }) => {
+      if (ctx.membership.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the workspace owner can view members.",
+        });
+      }
+
+      const rows = await ctx.prisma.workspaceMember.findMany({
+        where: { workspaceId: ctx.membership.workspace.id },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          role: true,
+          user: {
+            select: {
+              name: true,
+              githubUsername: true,
+            },
+          },
+        },
+      });
+
+      return rows.map((row) => ({
+        id: row.id,
+        role: row.role,
+        name: row.user.name,
+        githubUsername: row.user.githubUsername,
+      }));
+    }),
+    addMember: devProcedure
+      .input(
+        z.object({
+          githubUsername: z
+            .string()
+            .min(1)
+            .max(100)
+            .regex(/^[A-Za-z0-9-]+$/),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.membership.role !== "owner") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the workspace owner can add members.",
+          });
+        }
+
+        const user = await ctx.prisma.user.findFirst({
+          where: {
+            githubUsername: {
+              equals: input.githubUsername,
+              mode: "insensitive",
+            },
+          },
+          select: { id: true, githubUsername: true },
+        });
+
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "They need to sign in with GitHub once first.",
+          });
+        }
+
+        try {
+          await ctx.prisma.workspaceMember.create({
+            data: {
+              workspaceId: ctx.membership.workspace.id,
+              userId: user.id,
+              role: "dev",
+            },
+          });
+        } catch (error) {
+          if (isUniqueConflict(error)) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "That GitHub user is already a member.",
+            });
+          }
+
+          throw error;
+        }
+
+        return { githubUsername: user.githubUsername };
+      }),
   }),
   github: createTRPCRouter({
     installations: createTRPCRouter({

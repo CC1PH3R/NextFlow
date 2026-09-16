@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import Link from "next/link";
 
-import { signInWithGitHubToSession, signOutToSession } from "@/app/auth/actions";
+import { signInWithGitHub, signOutSession } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,13 +115,13 @@ export default async function DebugSessionPage() {
         </CardContent>
         <CardFooter className="gap-2">
           {session ? (
-            <form action={signOutToSession}>
+            <form action={signOutSession}>
               <Button type="submit" variant="outline">
                 Sign out
               </Button>
             </form>
           ) : githubAuthEnabled ? (
-            <form action={signInWithGitHubToSession}>
+            <form action={signInWithGitHub}>
               <Button type="submit">Sign in with GitHub</Button>
             </form>
           ) : (
@@ -133,10 +133,10 @@ export default async function DebugSessionPage() {
         </CardFooter>
       </Card>
       <Link
-        href="/dashboard"
+        href="/"
         className="text-sm font-medium underline-offset-4 hover:underline"
       >
-        Back to dashboard
+        Home
       </Link>
     </main>
   );

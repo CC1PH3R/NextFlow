@@ -20,6 +20,7 @@ Working locally:
 - Vercel Integration OAuth stores access tokens encrypted on `host_connections`; dashboard lists those projects
 - A site is a GitHub repo + Vercel project row; connecting the same repo twice is rejected
 - Site list reads latest production URL and status from Vercel (one failed site does not fail the list)
+- Second GitHub users get a `users` row on first login, then the owner adds them as a workspace member. Repo collaborator access is not the dashboard gate.
 
 OAuth login tokens and GitHub App installation tokens are not stored (not in the JWT, not in the cookie, not in Postgres). Vercel host tokens are AES-256-GCM ciphertext on `host_connections`. The GitHub App private key stays in `.env.local`.
 
@@ -40,9 +41,9 @@ npm run dev
 
 Restart `next dev` after any env change. Routes:
 
-- `/` — home
-- `/debug/session` — sign in / session debug
-- `/dashboard` — site list (unsigned users redirect to `/`)
+- `/` — home and sign in (signed-in non-members land here)
+- `/debug/session` — session diagnostics
+- `/dashboard` — site list (unsigned users and non-members redirect to `/`)
 
 Field-by-field GitHub form values live in `.env.example`
 
@@ -99,3 +100,15 @@ Create an **Integration** at [vercel.com/dashboard/integrations/console](https:/
 | Webhook URL | empty |
 
 Do not list it on the Marketplace. Put `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET`, and `VERCEL_INTEGRATION_SLUG` in `.env.local`, restart, then **Connect Vercel** on `/dashboard`. Vercel returns a long-lived access token; we encrypt it and list projects. The session cookie is unchanged.
+
+## 4. Second dev (workspace membership)
+
+The GitHub App and Vercel Integration are workspace-level. A teammate does **not** reinstall them, and GitHub repo collaborator access is not what opens `/dashboard`.
+
+1. They sign in with GitHub once (same OAuth App). That creates a `users` row and **no** membership.
+2. You (owner) add their GitHub username on `/dashboard`.
+3. They refresh `/dashboard` and see the same sites.
+
+**Local test:** keep yourself signed in in one browser. Open a **second browser** or a separate Chrome/Firefox profile (incognito works). Sign that browser into the second GitHub account, then Sign in with GitHub on `http://localhost:3000`. Same tab / same profile will reuse your first GitHub identity.
+
+They should land on `/` (“not on the team yet”). Add them from the owner dashboard (the team list is there). They refresh `/dashboard` and see the same sites. A third GitHub account that is never added still cannot see the sites.

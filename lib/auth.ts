@@ -43,7 +43,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: SESSION_MAX_AGE_SEC,
   },
   pages: {
-    signIn: "/debug/session",
+    signIn: "/",
   },
   providers: githubAuthEnabled
     ? [

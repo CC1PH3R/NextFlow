@@ -25,3 +25,23 @@ export async function createSiteAction(
   revalidatePath("/dashboard");
   return null;
 }
+
+export async function addMemberAction(
+  _previous: string | null,
+  formData: FormData,
+) {
+  try {
+    await caller.dev.workspace.addMember({
+      githubUsername: String(formData.get("githubUsername") ?? "").trim(),
+    });
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      return error.message;
+    }
+
+    throw error;
+  }
+
+  revalidatePath("/dashboard");
+  return null;
+}
