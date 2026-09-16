@@ -22,6 +22,7 @@ export type GitHubAccessibleRepo = {
   fullName: string;
   private: boolean;
   ownerLogin: string;
+  defaultBranch: string;
 };
 
 export async function getGitHubAppInstallation(
@@ -130,6 +131,12 @@ export async function listAccessibleRepos(
         fullName: repository.full_name,
         private: repository.private,
         ownerLogin: repository.owner.login,
+        defaultBranch:
+          "default_branch" in repository &&
+          typeof repository.default_branch === "string" &&
+          repository.default_branch.length > 0
+            ? repository.default_branch
+            : "main",
       });
     }
   }

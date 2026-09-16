@@ -1,7 +1,8 @@
+import { ConnectSiteForm } from "@/components/connect-site-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireDevAccess } from "@/lib/auth/require-dev-access";
 import { githubAppEnabled } from "@/lib/github/app";
 import { vercelOAuthEnabled } from "@/lib/hosts/vercel";
@@ -17,6 +18,7 @@ export default async function DashboardPage() {
     repos,
     vercelConnection,
     vercelProjects,
+    sites,
   ] = await Promise.all([
     caller.dev.health(),
     caller.dev.workspace.get(),
@@ -24,11 +26,18 @@ export default async function DashboardPage() {
     caller.dev.github.listRepos(),
     caller.dev.hosts.vercel.connected(),
     caller.dev.hosts.vercel.listProjects(),
+    caller.dev.sites.list(),
   ]);
   const vercel = {
     connected: vercelConnection.connected,
     projects: vercelProjects,
   };
+  const connectedRepos = new Set(
+    sites.map((site) => `${site.githubRepoOwner}/${site.githubRepoName}`.toLowerCase()),
+  );
+  const availableRepos = repos.filter(
+    (repo) => !connectedRepos.has(repo.fullName.toLowerCase()),
+  );
 
   return (
     <div className="space-y-6">
@@ -154,15 +163,11 @@ export default async function DashboardPage() {
         <CardHeader>
           <CardTitle>Sites</CardTitle>
           <CardDescription>
-            No sites yet. Host status will appear after a repo is connected.
+            A site joins a GitHub repo the App can see to a Vercel project.
           </CardDescription>
-          <CardAction>
-            <Button variant="outline" disabled>
-              Connect site
-            </Button>
-          </CardAction>
         </CardHeader>
         <CardContent>
+          <ConnectSiteForm repos={availableRepos} projects={vercel.projects} />
           <Table>
             <TableHeader>
               <TableRow>
@@ -173,7 +178,17 @@ export default async function DashboardPage() {
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody />
+            <TableBody>
+              {sites.map((site) => (
+                <TableRow key={site.id}>
+                  <TableCell>{site.name}</TableCell>
+                  <TableCell>{site.customDomain ?? "—"}</TableCell>
+                  <TableCell>—</TableCell>
+                  <TableCell>Vercel</TableCell>
+                  <TableCell>—</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
           </Table>
         </CardContent>
       </Card>

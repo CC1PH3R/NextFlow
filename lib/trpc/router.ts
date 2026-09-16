@@ -1,7 +1,34 @@
+import "server-only";
+
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+
 import { listAccessibleRepos } from "@/lib/github/adapter";
 import { githubAppEnabled } from "@/lib/github/app";
 import { getVercelAdapterForWorkspace } from "@/lib/hosts/vercel";
 import { createTRPCRouter, devProcedure, publicProcedure } from "@/lib/trpc/procedures";
+
+const createSiteInput = z.object({
+  repoFullName: z.string().regex(/^[^/\s]+\/[^/\s]+$/),
+  hostProjectId: z.string().min(1),
+});
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100);
+}
+
+function isUniqueConflict(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
 
 const devRouter = createTRPCRouter({
   health: publicProcedure.query(() => ({ ok: true as const })),
@@ -73,6 +100,112 @@ const devRouter = createTRPCRouter({
 
         return adapter.listProjects();
       }),
+    }),
+  }),
+  sites: createTRPCRouter({
+    list: devProcedure.query(async ({ ctx }) => {
+      return ctx.prisma.site.findMany({
+        where: { workspaceId: ctx.membership.workspace.id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          githubRepoOwner: true,
+          githubRepoName: true,
+          hostProvider: true,
+          hostProjectId: true,
+          customDomain: true,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+    }),
+    create: devProcedure.input(createSiteInput).mutation(async ({ ctx, input }) => {
+      const workspaceId = ctx.membership.workspace.id;
+      const [owner, repoName] = input.repoFullName.split("/");
+      const wanted = input.repoFullName.toLowerCase();
+
+      const installations = await ctx.prisma.gitHubInstallation.findMany({
+        where: { workspaceId },
+        select: { id: true, installationId: true },
+      });
+
+      let matched: {
+        githubInstallationId: string;
+        ownerLogin: string;
+        name: string;
+        defaultBranch: string;
+      } | null = null;
+
+      for (const installation of installations) {
+        const repos = await listAccessibleRepos(installation.installationId);
+        const repo = repos.find((item) => item.fullName.toLowerCase() === wanted);
+        if (repo) {
+          matched = {
+            githubInstallationId: installation.id,
+            ownerLogin: repo.ownerLogin,
+            name: repo.name,
+            defaultBranch: repo.defaultBranch,
+          };
+          break;
+        }
+      }
+
+      if (!matched || !owner || !repoName) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That repo is not on the GitHub App install.",
+        });
+      }
+
+      const adapter = await getVercelAdapterForWorkspace(workspaceId);
+      if (!adapter) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Connect Vercel before adding a site.",
+        });
+      }
+
+      const projects = await adapter.listProjects();
+      if (!projects.some((project) => project.id === input.hostProjectId)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That Vercel project is not on this connection.",
+        });
+      }
+
+      const slug = slugify(matched.name);
+      if (!slug) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Could not derive a slug from that repo name.",
+        });
+      }
+
+      try {
+        return await ctx.prisma.site.create({
+          data: {
+            workspaceId,
+            name: matched.name,
+            slug,
+            githubInstallationId: matched.githubInstallationId,
+            githubRepoOwner: matched.ownerLogin,
+            githubRepoName: matched.name,
+            githubDefaultBranch: matched.defaultBranch,
+            hostProvider: "vercel",
+            hostProjectId: input.hostProjectId,
+          },
+          select: { id: true, slug: true },
+        });
+      } catch (error) {
+        if (isUniqueConflict(error)) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "That repo is already connected.",
+          });
+        }
+
+        throw error;
+      }
     }),
   }),
 });
