@@ -10,6 +10,12 @@ export const env = createEnv({
     GITHUB_APP_ID: z.string().min(1).optional(),
     GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
     GITHUB_APP_SLUG: z.string().min(1).optional(),
+    TOKEN_ENCRYPTION_KEY: z
+      .string()
+      .refine(
+        (value) => Buffer.from(value, "base64").length === 32,
+        "TOKEN_ENCRYPTION_KEY must be 32 bytes as base64 (openssl rand -base64 32)",
+      ),
   },
   client: {},
   runtimeEnv: {
@@ -20,6 +26,7 @@ export const env = createEnv({
     GITHUB_APP_ID: process.env.GITHUB_APP_ID,
     GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY,
     GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
+    TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY,
   },
   emptyStringAsUndefined: true,
 });

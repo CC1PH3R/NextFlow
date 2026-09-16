@@ -15,6 +15,7 @@ Working locally:
 - `/dashboard` requires a session
 - GitHub App install stores `installation_id` + account on `github_installations`
 - Dashboard lists repos that install can see (Octokit + a short-lived installation token; the token is not stored)
+- `TOKEN_ENCRYPTION_KEY` (AES-256-GCM) is ready for host tokens at rest; nothing is stored encrypted yet
 
 OAuth access tokens and GitHub App installation tokens are not stored (not in the JWT, not in the cookie, not in Postgres). The App private key stays in `.env.local`.
 
@@ -24,11 +25,12 @@ OAuth access tokens and GitHub App installation tokens are not stored (not in th
 cp .env.example .env.local
 ```
 
-Fill `.env.local`, then:
+Fill `.env.local` (`TOKEN_ENCRYPTION_KEY` is `openssl rand -base64 32`, not `AUTH_SECRET`), then:
 
 ```bash
 npm install
 npm run db:migrate
+npm test
 npm run dev
 ```
 
@@ -38,7 +40,7 @@ Restart `next dev` after any env change. Routes:
 - `/debug/session` — sign in / session debug
 - `/dashboard` — workspace + GitHub App install (unsigned users redirect to `/`)
 
-Field-by-field GitHub form values live in `.env.example`. Specs: `nextflow-phase-1.md`, `nextflow-spec.md`.
+Field-by-field GitHub form values live in `.env.example`
 
 ## 1. GitHub OAuth App (who you are)
 

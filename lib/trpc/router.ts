@@ -24,7 +24,7 @@ const devRouter = createTRPCRouter({
         return rows.map((row) => ({
           id: row.id,
           installationId: row.installationId.toString(),
-          accountLogin: row.accpkcs8ountLogin,
+          accountLogin: row.accountLogin,
           accountType: row.accountType,
         }));
       }),
