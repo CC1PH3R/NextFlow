@@ -15,9 +15,10 @@ Working locally:
 - `/dashboard` requires a session
 - GitHub App install stores `installation_id` + account on `github_installations`
 - Dashboard lists repos that install can see (Octokit + a short-lived installation token; the token is not stored)
-- `TOKEN_ENCRYPTION_KEY` (AES-256-GCM) is ready for host tokens at rest; nothing is stored encrypted yet
+- `TOKEN_ENCRYPTION_KEY` (AES-256-GCM) is ready for host tokens at rest
+- Vercel Integration OAuth stores access tokens encrypted on `host_connections`; dashboard lists those projects
 
-OAuth access tokens and GitHub App installation tokens are not stored (not in the JWT, not in the cookie, not in Postgres). The App private key stays in `.env.local`.
+OAuth login tokens and GitHub App installation tokens are not stored (not in the JWT, not in the cookie, not in Postgres). Vercel host tokens are AES-256-GCM ciphertext on `host_connections`. The GitHub App private key stays in `.env.local`.
 
 ## Setup
 
@@ -38,7 +39,7 @@ Restart `next dev` after any env change. Routes:
 
 - `/` — home
 - `/debug/session` — sign in / session debug
-- `/dashboard` — workspace + GitHub App install (unsigned users redirect to `/`)
+- `/dashboard` — workspace, GitHub App, Vercel projects (unsigned users redirect to `/`)
 
 Field-by-field GitHub form values live in `.env.example`
 
@@ -83,3 +84,15 @@ GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVA
 An unquoted multiline PEM is truncated; setup then 500s with `DECODER routines::unsupported`. `*.pem` downloads belong in env, not in git (already gitignored).
 
 Install from **Install GitHub App** on `/dashboard`, pick **Only select repositories**, choose the private repo(s). GitHub redirects to `/api/github/setup?installation_id=…`. The dashboard should show `account (User|Organization) · <installation_id>`.
+
+## 3. Vercel Integration (host access)
+
+Create an **Integration** at [vercel.com/dashboard/integrations/console](https://vercel.com/dashboard/integrations/console). This is not Sign in with Vercel, and not GitHub.
+
+| Field | Local value |
+| --- | --- |
+| Redirect URL | `http://localhost:3000/api/vercel/callback` |
+| API scopes | **Project** read, **Deployment** read |
+| Webhook URL | empty |
+
+Do not list it on the Marketplace. Put `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET`, and `VERCEL_INTEGRATION_SLUG` in `.env.local`, restart, then **Connect Vercel** on `/dashboard`. Vercel returns a long-lived access token; we encrypt it and list projects. The session cookie is unchanged.

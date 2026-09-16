@@ -1,5 +1,6 @@
 import { listAccessibleRepos } from "@/lib/github/adapter";
 import { githubAppEnabled } from "@/lib/github/app";
+import { getVercelAdapterForWorkspace } from "@/lib/hosts/vercel";
 import { createTRPCRouter, devProcedure, publicProcedure } from "@/lib/trpc/procedures";
 
 const devRouter = createTRPCRouter({
@@ -46,6 +47,32 @@ const devRouter = createTRPCRouter({
       }
 
       return repos;
+    }),
+  }),
+  hosts: createTRPCRouter({
+    vercel: createTRPCRouter({
+      connected: devProcedure.query(async ({ ctx }) => {
+        const row = await ctx.prisma.hostConnection.findFirst({
+          where: {
+            workspaceId: ctx.membership.workspace.id,
+            provider: "vercel",
+          },
+          select: { id: true },
+        });
+
+        return { connected: Boolean(row) };
+      }),
+      listProjects: devProcedure.query(async ({ ctx }) => {
+        const adapter = await getVercelAdapterForWorkspace(
+          ctx.membership.workspace.id,
+        );
+
+        if (!adapter) {
+          return [];
+        }
+
+        return adapter.listProjects();
+      }),
     }),
   }),
 });

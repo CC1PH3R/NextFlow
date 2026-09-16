@@ -4,17 +4,31 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireDevAccess } from "@/lib/auth/require-dev-access";
 import { githubAppEnabled } from "@/lib/github/app";
+import { vercelOAuthEnabled } from "@/lib/hosts/vercel";
 import { caller } from "@/lib/trpc/server";
 
 export default async function DashboardPage() {
   await requireDevAccess();
 
-  const [health, membership, installations, repos] = await Promise.all([
+  const [
+    health,
+    membership,
+    installations,
+    repos,
+    vercelConnection,
+    vercelProjects,
+  ] = await Promise.all([
     caller.dev.health(),
     caller.dev.workspace.get(),
     caller.dev.github.installations.list(),
     caller.dev.github.listRepos(),
+    caller.dev.hosts.vercel.connected(),
+    caller.dev.hosts.vercel.listProjects(),
   ]);
+  const vercel = {
+    connected: vercelConnection.connected,
+    projects: vercelProjects,
+  };
 
   return (
     <div className="space-y-6">
@@ -90,6 +104,47 @@ export default async function DashboardPage() {
               {githubAppEnabled
                 ? "No installation yet. Install on one private repo."
                 : "Add GITHUB_APP_ID, GITHUB_APP_SLUG, and GITHUB_APP_PRIVATE_KEY to .env.local, then restart."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Vercel</CardTitle>
+          <CardDescription>
+            Host status is the Vercel connection, not the GitHub login.
+          </CardDescription>
+          <CardAction>
+            {vercelOAuthEnabled ? (
+              <Button nativeButton={false} render={<a href="/api/vercel/connect" />}>
+                {vercel.connected ? "Reconnect Vercel" : "Connect Vercel"}
+              </Button>
+            ) : (
+              <Button variant="outline" disabled>
+                Connect Vercel
+              </Button>
+            )}
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {vercel.connected ? (
+            vercel.projects.length > 0 ? (
+              <ul className="space-y-1 text-sm">
+                {vercel.projects.map((project) => (
+                  <li key={project.id}>{project.name}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Connected, but this integration cannot see any projects yet.
+              </p>
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {vercelOAuthEnabled
+                ? "No Vercel connection yet."
+                : "Add VERCEL_CLIENT_ID, VERCEL_CLIENT_SECRET, and VERCEL_INTEGRATION_SLUG to .env.local, then restart."}
             </p>
           )}
         </CardContent>
