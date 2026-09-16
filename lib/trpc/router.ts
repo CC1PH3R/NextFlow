@@ -6,6 +6,7 @@ import { z } from "zod";
 import { listAccessibleRepos } from "@/lib/github/adapter";
 import { githubAppEnabled } from "@/lib/github/app";
 import { getVercelAdapterForWorkspace } from "@/lib/hosts/vercel";
+import { mapHostStatus } from "@/lib/hosts/types";
 import { createTRPCRouter, devProcedure, publicProcedure } from "@/lib/trpc/procedures";
 
 const createSiteInput = z.object({
@@ -33,7 +34,13 @@ function isUniqueConflict(error: unknown) {
 const devRouter = createTRPCRouter({
   health: publicProcedure.query(() => ({ ok: true as const })),
   workspace: createTRPCRouter({
-    get: devProcedure.query(({ ctx }) => ctx.membership),
+    get: devProcedure.query(({ ctx }) => ({
+      ...ctx.membership,
+      user: {
+        name: ctx.user.name,
+        githubUsername: ctx.user.githubUsername,
+      },
+    })),
   }),
   github: createTRPCRouter({
     installations: createTRPCRouter({
@@ -104,7 +111,7 @@ const devRouter = createTRPCRouter({
   }),
   sites: createTRPCRouter({
     list: devProcedure.query(async ({ ctx }) => {
-      return ctx.prisma.site.findMany({
+      const rows = await ctx.prisma.site.findMany({
         where: { workspaceId: ctx.membership.workspace.id },
         select: {
           id: true,
@@ -118,6 +125,59 @@ const devRouter = createTRPCRouter({
         },
         orderBy: { createdAt: "asc" },
       });
+
+      const adapter = await getVercelAdapterForWorkspace(
+        ctx.membership.workspace.id,
+      );
+
+      const hosts = await Promise.all(
+        rows.map(async (site) => {
+          if (!adapter) {
+            return {
+              url: null,
+              status: "unknown" as const,
+              publishedAt: null,
+              error: "Vercel is not connected.",
+            };
+          }
+
+          if (!site.hostProjectId) {
+            return {
+              url: null,
+              status: "unknown" as const,
+              publishedAt: null,
+              error: "This site has no host project.",
+            };
+          }
+
+          try {
+            const production = await adapter.getLatestProduction(
+              site.hostProjectId,
+            );
+            return {
+              url: production.url,
+              status: mapHostStatus(production.status),
+              publishedAt: production.createdAt,
+              error: null,
+            };
+          } catch (error) {
+            return {
+              url: null,
+              status: "unknown" as const,
+              publishedAt: null,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Host status unavailable.",
+            };
+          }
+        }),
+      );
+
+      return rows.map((site, index) => ({
+        ...site,
+        host: hosts[index],
+      }));
     }),
     create: devProcedure.input(createSiteInput).mutation(async ({ ctx, input }) => {
       const workspaceId = ctx.membership.workspace.id;

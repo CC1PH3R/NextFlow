@@ -12,12 +12,14 @@ Working locally:
 - Postgres via Prisma
 - GitHub OAuth login (`read:user`, `user:email` only) — identity, not repo access
 - First GitHub login creates workspace `nextflow` and makes that user the owner
-- `/dashboard` requires a session
+- `/dashboard` is the site list: production URL, last publish, Vercel status
+- Header shows who you are; Install GitHub App / Connect Vercel only if missing
 - GitHub App install stores `installation_id` + account on `github_installations`
 - Dashboard lists repos that install can see (Octokit + a short-lived installation token; the token is not stored)
 - `TOKEN_ENCRYPTION_KEY` (AES-256-GCM) is ready for host tokens at rest
 - Vercel Integration OAuth stores access tokens encrypted on `host_connections`; dashboard lists those projects
 - A site is a GitHub repo + Vercel project row; connecting the same repo twice is rejected
+- Site list reads latest production URL and status from Vercel (one failed site does not fail the list)
 
 OAuth login tokens and GitHub App installation tokens are not stored (not in the JWT, not in the cookie, not in Postgres). Vercel host tokens are AES-256-GCM ciphertext on `host_connections`. The GitHub App private key stays in `.env.local`.
 
@@ -40,7 +42,7 @@ Restart `next dev` after any env change. Routes:
 
 - `/` — home
 - `/debug/session` — sign in / session debug
-- `/dashboard` — workspace, GitHub App, Vercel projects (unsigned users redirect to `/`)
+- `/dashboard` — site list (unsigned users redirect to `/`)
 
 Field-by-field GitHub form values live in `.env.example`
 

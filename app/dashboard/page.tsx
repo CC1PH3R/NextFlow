@@ -1,197 +1,138 @@
 import { ConnectSiteForm } from "@/components/connect-site-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireDevAccess } from "@/lib/auth/require-dev-access";
-import { githubAppEnabled } from "@/lib/github/app";
-import { vercelOAuthEnabled } from "@/lib/hosts/vercel";
 import { caller } from "@/lib/trpc/server";
 
 export default async function DashboardPage() {
   await requireDevAccess();
 
-  const [
-    health,
-    membership,
-    installations,
-    repos,
-    vercelConnection,
-    vercelProjects,
-    sites,
-  ] = await Promise.all([
-    caller.dev.health(),
-    caller.dev.workspace.get(),
-    caller.dev.github.installations.list(),
-    caller.dev.github.listRepos(),
-    caller.dev.hosts.vercel.connected(),
-    caller.dev.hosts.vercel.listProjects(),
+  const [sites, installations, vercelConnection] = await Promise.all([
     caller.dev.sites.list(),
+    caller.dev.github.installations.list(),
+    caller.dev.hosts.vercel.connected(),
   ]);
-  const vercel = {
-    connected: vercelConnection.connected,
-    projects: vercelProjects,
-  };
+
+  const githubReady = installations.length > 0;
+  const vercelReady = vercelConnection.connected;
+
+  let repos: Awaited<ReturnType<typeof caller.dev.github.listRepos>> = [];
+  let projects: Awaited<ReturnType<typeof caller.dev.hosts.vercel.listProjects>> =
+    [];
+  let pickListError: string | null = null;
+
+  if (githubReady && vercelReady) {
+    try {
+      [repos, projects] = await Promise.all([
+        caller.dev.github.listRepos(),
+        caller.dev.hosts.vercel.listProjects(),
+      ]);
+    } catch {
+      pickListError = "Could not load GitHub repos or Vercel projects.";
+    }
+  }
+
   const connectedRepos = new Set(
     sites.map((site) => `${site.githubRepoOwner}/${site.githubRepoName}`.toLowerCase()),
   );
   const availableRepos = repos.filter(
     (repo) => !connectedRepos.has(repo.fullName.toLowerCase()),
   );
+  const canConnect = availableRepos.length > 0 && projects.length > 0;
 
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-3">
-          <h1 className="font-heading text-2xl font-medium tracking-tight">
-            Dashboard
-          </h1>
-          <Badge variant={health.ok ? "secondary" : "destructive"}>
-            API {health.ok ? "ok" : "down"}
-          </Badge>
-          <Badge variant="outline">
-            {membership.workspace.slug} · {membership.role}
-          </Badge>
-        </div>
+        <h1 className="font-heading text-2xl font-medium tracking-tight">
+          Sites
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Connected Next.js sites will show up here.
+          Production URL and status from Vercel. Refresh to update.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>GitHub App</CardTitle>
-          <CardDescription>
-            Repo access is the App install, not the login you used to sign in.
-          </CardDescription>
-          <CardAction>
-            {githubAppEnabled ? (
-              <Button nativeButton={false} render={<a href="/api/github/install" />}>
-                {installations.length > 0
-                  ? "Add or update install"
-                  : "Install GitHub App"}
-              </Button>
-            ) : (
-              <Button variant="outline" disabled>
-                Install GitHub App
-              </Button>
-            )}
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          {installations.length > 0 ? (
-            <div className="space-y-4">
-              <ul className="space-y-1 text-sm">
-                {installations.map((installation) => (
-                  <li key={installation.id}>
-                    {installation.accountLogin}{" "}
-                    <span className="text-muted-foreground">
-                      ({installation.accountType}) · {installation.installationId}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {repos.length > 0 ? (
-                <ul className="space-y-1 text-sm">
-                  {repos.map((repo) => (
-                    <li key={repo.id}>
-                      {repo.fullName}
-                      <span className="text-muted-foreground">
-                        {repo.private ? " · private" : " · public"}
+      {sites.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No sites yet.
+          {!githubReady
+            ? " Install the GitHub App from the header."
+            : null}
+          {githubReady && !vercelReady
+            ? " Connect Vercel from the header."
+            : null}
+        </p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Domain</TableHead>
+              <TableHead>Last publish</TableHead>
+              <TableHead>Host</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sites.map((site) => (
+              <TableRow key={site.id}>
+                <TableCell>{site.name}</TableCell>
+                <TableCell>
+                  {site.host.url ? (
+                    <a
+                      href={site.host.url}
+                      className="underline-offset-4 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {site.customDomain ?? new URL(site.host.url).host}
+                    </a>
+                  ) : (
+                    (site.customDomain ?? "—")
+                  )}
+                </TableCell>
+                <TableCell>
+                  {site.host.publishedAt
+                    ? site.host.publishedAt.toLocaleString("en-GB", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : "—"}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">Vercel</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-0.5">
+                    <Badge
+                      variant={
+                        site.host.status === "error"
+                          ? "destructive"
+                          : site.host.status === "ready"
+                            ? "secondary"
+                            : "outline"
+                      }
+                    >
+                      {site.host.status}
+                    </Badge>
+                    {site.host.error ? (
+                      <span className="text-xs text-muted-foreground">
+                        {site.host.error}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  This install cannot see any repositories yet.
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {githubAppEnabled
-                ? "No installation yet. Install on one private repo."
-                : "Add GITHUB_APP_ID, GITHUB_APP_SLUG, and GITHUB_APP_PRIVATE_KEY to .env.local, then restart."}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Vercel</CardTitle>
-          <CardDescription>
-            Host status is the Vercel connection, not the GitHub login.
-          </CardDescription>
-          <CardAction>
-            {vercelOAuthEnabled ? (
-              <Button nativeButton={false} render={<a href="/api/vercel/connect" />}>
-                {vercel.connected ? "Reconnect Vercel" : "Connect Vercel"}
-              </Button>
-            ) : (
-              <Button variant="outline" disabled>
-                Connect Vercel
-              </Button>
-            )}
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          {vercel.connected ? (
-            vercel.projects.length > 0 ? (
-              <ul className="space-y-1 text-sm">
-                {vercel.projects.map((project) => (
-                  <li key={project.id}>{project.name}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Connected, but this integration cannot see any projects yet.
-              </p>
-            )
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {vercelOAuthEnabled
-                ? "No Vercel connection yet."
-                : "Add VERCEL_CLIENT_ID, VERCEL_CLIENT_SECRET, and VERCEL_INTEGRATION_SLUG to .env.local, then restart."}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Sites</CardTitle>
-          <CardDescription>
-            A site joins a GitHub repo the App can see to a Vercel project.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ConnectSiteForm repos={availableRepos} projects={vercel.projects} />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Domain</TableHead>
-                <TableHead>Last publish</TableHead>
-                <TableHead>Host</TableHead>
-                <TableHead>Status</TableHead>
+                    ) : null}
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sites.map((site) => (
-                <TableRow key={site.id}>
-                  <TableCell>{site.name}</TableCell>
-                  <TableCell>{site.customDomain ?? "—"}</TableCell>
-                  <TableCell>—</TableCell>
-                  <TableCell>Vercel</TableCell>
-                  <TableCell>—</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      {pickListError ? (
+        <p className="text-sm text-destructive">{pickListError}</p>
+      ) : null}
+      {canConnect ? (
+        <ConnectSiteForm repos={availableRepos} projects={projects} />
+      ) : null}
     </div>
   );
 }

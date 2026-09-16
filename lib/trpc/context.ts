@@ -22,6 +22,8 @@ export async function createTRPCContext(opts: { headers: Headers }) {
     select: {
       id: true,
       tier: true,
+      name: true,
+      githubUsername: true,
       memberships: {
         take: 1,
         select: {
@@ -46,7 +48,14 @@ export async function createTRPCContext(opts: { headers: Headers }) {
     prisma,
     headers: opts.headers,
     session,
-    user: user ? { id: user.id, tier: user.tier } : null,
+    user: user
+      ? {
+          id: user.id,
+          tier: user.tier,
+          name: user.name,
+          githubUsername: user.githubUsername,
+        }
+      : null,
     membership,
   };
 }

@@ -24,11 +24,7 @@ export function ConnectSiteForm({
   const [error, action, pending] = useActionState(createSiteAction, null);
 
   if (repos.length === 0 || projects.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Connect a GitHub repo and a Vercel project above, then pick both here.
-      </p>
-    );
+    return null;
   }
 
   return (
