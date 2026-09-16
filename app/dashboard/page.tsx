@@ -2,14 +2,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { requireDevAccess } from "@/lib/auth/require-dev-access";
 import { githubAppEnabled } from "@/lib/github/app";
 import { caller } from "@/lib/trpc/server";
 
 export default async function DashboardPage() {
-  const [health, membership, installations] = await Promise.all([
+  await requireDevAccess();
+
+  const [health, membership, installations, repos] = await Promise.all([
     caller.dev.health(),
     caller.dev.workspace.get(),
     caller.dev.github.installations.list(),
+    caller.dev.github.listRepos(),
   ]);
 
   return (
@@ -53,16 +57,34 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           {installations.length > 0 ? (
-            <ul className="space-y-1 text-sm">
-              {installations.map((installation) => (
-                <li key={installation.id}>
-                  {installation.accountLogin}{" "}
-                  <span className="text-muted-foreground">
-                    ({installation.accountType}) · {installation.installationId}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-4">
+              <ul className="space-y-1 text-sm">
+                {installations.map((installation) => (
+                  <li key={installation.id}>
+                    {installation.accountLogin}{" "}
+                    <span className="text-muted-foreground">
+                      ({installation.accountType}) · {installation.installationId}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {repos.length > 0 ? (
+                <ul className="space-y-1 text-sm">
+                  {repos.map((repo) => (
+                    <li key={repo.id}>
+                      {repo.fullName}
+                      <span className="text-muted-foreground">
+                        {repo.private ? " · private" : " · public"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  This install cannot see any repositories yet.
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">
               {githubAppEnabled

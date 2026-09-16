@@ -1,12 +1,27 @@
-// GitHub adapter
+/**
+ * GitHub adapter.
+ *
+ * Identity = OAuth App. Access = GitHub App installation.
+ * listAccessibleRepos uses an installation token Octokit mints per request.
+ * That token is not stored.
+ */
+
 import "server-only";
 
-import { createGitHubAppJwt } from "@/lib/github/app";
+import { createGitHubApp, createGitHubAppJwt } from "@/lib/github/app";
 
 export type GitHubInstallationAccount = {
   installationId: bigint;
   accountLogin: string;
   accountType: "User" | "Organization";
+};
+
+export type GitHubAccessibleRepo = {
+  id: number;
+  name: string;
+  fullName: string;
+  private: boolean;
+  ownerLogin: string;
 };
 
 export async function getGitHubAppInstallation(
@@ -54,4 +69,70 @@ export async function getGitHubAppInstallation(
     accountLogin: account.login,
     accountType: account.type,
   };
+}
+
+function repositoriesFromPage(data: unknown) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (
+    data &&
+    typeof data === "object" &&
+    "repositories" in data &&
+    Array.isArray(data.repositories)
+  ) {
+    return data.repositories;
+  }
+
+  return [];
+}
+
+export async function listAccessibleRepos(
+  installationId: bigint,
+): Promise<GitHubAccessibleRepo[]> {
+  const octokit = await createGitHubApp().getInstallationOctokit(
+    Number(installationId),
+  );
+  const repos: GitHubAccessibleRepo[] = [];
+  let remainingLogged = false;
+
+  for await (const response of octokit.paginate.iterator(
+    "GET /installation/repositories",
+    { per_page: 100 },
+  )) {
+    if (!remainingLogged) {
+      console.info(
+        "GitHub x-ratelimit-remaining",
+        response.headers["x-ratelimit-remaining"],
+      );
+      remainingLogged = true;
+    }
+
+    for (const repository of repositoriesFromPage(response.data)) {
+      if (
+        !repository ||
+        typeof repository !== "object" ||
+        typeof repository.id !== "number" ||
+        typeof repository.name !== "string" ||
+        typeof repository.full_name !== "string" ||
+        typeof repository.private !== "boolean" ||
+        !repository.owner ||
+        typeof repository.owner !== "object" ||
+        typeof repository.owner.login !== "string"
+      ) {
+        continue;
+      }
+
+      repos.push({
+        id: repository.id,
+        name: repository.name,
+        fullName: repository.full_name,
+        private: repository.private,
+        ownerLogin: repository.owner.login,
+      });
+    }
+  }
+
+  return repos;
 }

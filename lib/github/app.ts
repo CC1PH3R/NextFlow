@@ -1,6 +1,7 @@
 import { createPrivateKey } from "node:crypto";
 
 import { SignJWT, importPKCS8 } from "jose";
+import { App } from "octokit";
 
 import { env } from "@/lib/env";
 
@@ -29,6 +30,18 @@ function privateKeyPem() {
   }
 
   return pem;
+}
+
+/** Octokit App client. Installation tokens are minted by Octokit, not stored. */
+export function createGitHubApp() {
+  if (!env.GITHUB_APP_ID) {
+    throw new Error("GITHUB_APP_ID is not set.");
+  }
+
+  return new App({
+    appId: env.GITHUB_APP_ID,
+    privateKey: privateKeyPem(),
+  });
 }
 
 /** App JWT authenticates as the GitHub App, not as a user. Lifetime ≤ 10 minutes. */

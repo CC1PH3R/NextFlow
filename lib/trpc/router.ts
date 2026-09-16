@@ -1,3 +1,5 @@
+import { listAccessibleRepos } from "@/lib/github/adapter";
+import { githubAppEnabled } from "@/lib/github/app";
 import { createTRPCRouter, devProcedure, publicProcedure } from "@/lib/trpc/procedures";
 
 const devRouter = createTRPCRouter({
@@ -22,10 +24,28 @@ const devRouter = createTRPCRouter({
         return rows.map((row) => ({
           id: row.id,
           installationId: row.installationId.toString(),
-          accountLogin: row.accountLogin,
+          accountLogin: row.accpkcs8ountLogin,
           accountType: row.accountType,
         }));
       }),
+    }),
+    listRepos: devProcedure.query(async ({ ctx }) => {
+      if (!githubAppEnabled) {
+        return [];
+      }
+
+      const installations = await ctx.prisma.gitHubInstallation.findMany({
+        where: { workspaceId: ctx.membership.workspace.id },
+        select: { installationId: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const repos = [];
+      for (const installation of installations) {
+        repos.push(...(await listAccessibleRepos(installation.installationId)));
+      }
+
+      return repos;
     }),
   }),
 });

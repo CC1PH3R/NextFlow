@@ -1,20 +1,14 @@
-import { redirect } from "next/navigation";
-
 import { signOutSession } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { auth } from "@/lib/auth";
+import { requireDevAccess } from "@/lib/auth/require-dev-access";
 
 export default async function DashboardLayout({
   children,
 }: LayoutProps<"/dashboard">) {
-  const session = await auth();
-
-  if (!session?.userId) {
-    redirect("/");
-  }
+  await requireDevAccess();
 
   return (
     <div className="min-h-svh bg-background">

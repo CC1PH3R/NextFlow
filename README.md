@@ -14,6 +14,7 @@ Working locally:
 - First GitHub login creates workspace `nextflow` and makes that user the owner
 - `/dashboard` requires a session
 - GitHub App install stores `installation_id` + account on `github_installations`
+- Dashboard lists repos that install can see (Octokit + a short-lived installation token; the token is not stored)
 
 OAuth access tokens and GitHub App installation tokens are not stored (not in the JWT, not in the cookie, not in Postgres). The App private key stays in `.env.local`.
 
