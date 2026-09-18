@@ -1,15 +1,10 @@
-import { Geist } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
 import "./globals.css";
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
 
 export const metadata: Metadata = {
   title: "NextFlow",
@@ -21,7 +16,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("font-sans", geist.variable)}
+      className={cn("font-sans", GeistSans.variable)}
     >
       <body className="min-h-svh antialiased">
         <ThemeProvider
