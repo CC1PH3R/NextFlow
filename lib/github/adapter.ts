@@ -143,3 +143,99 @@ export async function listAccessibleRepos(
 
   return repos;
 }
+
+export type DependabotAlert = {
+  number: number;
+  title: string;
+  severity: string | null;
+  packageName: string | null;
+};
+
+function isDependabotDisabled(error: unknown) {
+  if (!error || typeof error !== "object" || !("status" in error)) {
+    return false;
+  }
+
+  if (error.status !== 403) {
+    return false;
+  }
+
+  const message =
+    "message" in error && typeof error.message === "string" ? error.message : "";
+  return message.toLowerCase().includes("dependabot alerts are disabled");
+}
+
+function stringField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" ? value : null;
+}
+
+function objectField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function alertFromPayload(alert: unknown): DependabotAlert | null {
+  if (!alert || typeof alert !== "object") {
+    return null;
+  }
+
+  const record = alert as Record<string, unknown>;
+  if (typeof record.number !== "number") {
+    return null;
+  }
+
+  const advisory = objectField(record, "security_advisory");
+  const vulnerability = objectField(record, "security_vulnerability");
+  const dependency = objectField(record, "dependency");
+  const pkg = dependency ? objectField(dependency, "package") : null;
+
+  return {
+    number: record.number,
+    title: (advisory && stringField(advisory, "summary")) ?? `Alert #${record.number}`,
+    severity: vulnerability ? stringField(vulnerability, "severity") : null,
+    packageName: pkg ? stringField(pkg, "name") : null,
+  };
+}
+
+/** Open Dependabot findings. Disabled Dependabot is an empty list, not an error. */
+export async function listDependabotAlerts(
+  installationId: bigint,
+  owner: string,
+  repo: string,
+): Promise<DependabotAlert[]> {
+  const octokit = await createGitHubApp().getInstallationOctokit(
+    Number(installationId),
+  );
+  const alerts: DependabotAlert[] = [];
+
+  try {
+    for await (const response of octokit.paginate.iterator(
+      "GET /repos/{owner}/{repo}/dependabot/alerts",
+      { owner, repo, state: "open", per_page: 100 },
+    )) {
+      if (!Array.isArray(response.data)) {
+        continue;
+      }
+
+      for (const alert of response.data) {
+        const parsed = alertFromPayload(alert);
+        if (parsed) {
+          alerts.push(parsed);
+        }
+      }
+    }
+  } catch (error) {
+    if (isDependabotDisabled(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return alerts;
+}

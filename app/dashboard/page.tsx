@@ -8,12 +8,14 @@ import { caller } from "@/lib/trpc/server";
 export default async function DashboardPage() {
   await requireDevAccess();
 
-  const [membership, sites, installations, vercelConnection] = await Promise.all([
-    caller.dev.workspace.get(),
-    caller.dev.sites.list(),
-    caller.dev.github.installations.list(),
-    caller.dev.hosts.vercel.connected(),
-  ]);
+  const [membership, sites, installations, vercelConnection, maintenance] =
+    await Promise.all([
+      caller.dev.workspace.get(),
+      caller.dev.sites.list(),
+      caller.dev.github.installations.list(),
+      caller.dev.hosts.vercel.connected(),
+      caller.dev.maintenance.alerts(),
+    ]);
   const members =
     membership.role === "owner" ? await caller.dev.workspace.listMembers() : [];
 
@@ -130,6 +132,43 @@ export default async function DashboardPage() {
           </TableBody>
         </Table>
       )}
+
+      {sites.length > 0 ? (
+        <div className="space-y-3 border-t pt-6">
+          <div>
+            <h2 className="text-sm font-medium">Maintenance</h2>
+            <p className="text-sm text-muted-foreground">
+              Open Dependabot alerts. An alert joins the review queue only when
+              it becomes a pull request.
+            </p>
+          </div>
+          <ul className="space-y-3 text-sm">
+            {maintenance.map((site) => (
+              <li key={site.siteId}>
+                <p className="font-medium">
+                  {site.siteName}
+                  {site.error ? null : ` · ${site.alerts.length} open`}
+                </p>
+                {site.error ? (
+                  <p className="text-muted-foreground">{site.error}</p>
+                ) : site.alerts.length === 0 ? (
+                  <p className="text-muted-foreground">No open alerts.</p>
+                ) : (
+                  <ul className="mt-1 space-y-1 text-muted-foreground">
+                    {site.alerts.map((alert) => (
+                      <li key={alert.number}>
+                        {alert.packageName ? `${alert.packageName}: ` : null}
+                        {alert.title}
+                        {alert.severity ? ` (${alert.severity})` : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {pickListError ? (
         <p className="text-sm text-destructive">{pickListError}</p>

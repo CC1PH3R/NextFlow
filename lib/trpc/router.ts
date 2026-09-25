@@ -3,7 +3,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { listAccessibleRepos } from "@/lib/github/adapter";
+import { listAccessibleRepos, listDependabotAlerts } from "@/lib/github/adapter";
 import { githubAppEnabled } from "@/lib/github/app";
 import { getVercelAdapterForWorkspace } from "@/lib/hosts/vercel";
 import { mapHostStatus } from "@/lib/hosts/types";
@@ -193,6 +193,44 @@ const devRouter = createTRPCRouter({
 
         return adapter.listProjects();
       }),
+    }),
+  }),
+  maintenance: createTRPCRouter({
+    alerts: devProcedure.query(async ({ ctx }) => {
+      const sites = await ctx.prisma.site.findMany({
+        where: { workspaceId: ctx.membership.workspace.id },
+        select: {
+          id: true,
+          name: true,
+          githubRepoOwner: true,
+          githubRepoName: true,
+          githubInstallation: { select: { installationId: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      return Promise.all(
+        sites.map(async (site) => {
+          try {
+            const alerts = await listDependabotAlerts(
+              site.githubInstallation.installationId,
+              site.githubRepoOwner,
+              site.githubRepoName,
+            );
+            return { siteId: site.id, siteName: site.name, alerts, error: null };
+          } catch (error) {
+            return {
+              siteId: site.id,
+              siteName: site.name,
+              alerts: [],
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Dependabot alerts unavailable.",
+            };
+          }
+        }),
+      );
     }),
   }),
   sites: createTRPCRouter({
