@@ -69,11 +69,22 @@ Create a **GitHub App** once at [github.com/settings/apps/new](https://github.co
 | Setup URL | `http://localhost:3000/api/github/setup` |
 | Redirect on update | on |
 | Webhook | inactive |
-| Repository permissions | **Contents** read, **Metadata** read |
+| Repository permissions | see the list below |
+| Organization / account permissions | none |
 | Install | Only on this account |
 | Request user authorization during installation | off |
 
-Without Contents + Metadata, GitHub will only offer “No repositories” and the dashboard cannot later list repos.
+Repository permissions:
+
+| Permission | Access | Why |
+| --- | --- | --- |
+| Actions | Read and write | `workflow_dispatch` |
+| Checks | Read-only | CI status on a pull request |
+| Contents | Read and write | Read files, merge |
+| Dependabot alerts | Read-only | Open alert list |
+| Metadata | Read-only | Required to see any repo. Already granted. |
+| Pull requests | Read and write | Diff, merge, close |
+| Workflows | Read and write | Commit `.github/workflows/*.yml`. Contents write cannot do that. |
 
 Env:
 

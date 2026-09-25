@@ -26,6 +26,22 @@ enum GitHubAccountType {
   Organization
 }
 
+enum ReviewKind {
+  content
+  maintenance
+}
+
+enum ReviewSource {
+  dependabot
+  github_action
+}
+
+enum ReviewStatus {
+  pending
+  merged
+  rejected
+}
+
 model User {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email          String    @unique @db.VarChar(255)
@@ -38,8 +54,11 @@ model User {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  ownedWorkspaces Workspace[]        @relation("WorkspaceOwner")
-  memberships     WorkspaceMember[]
+  ownedWorkspaces     Workspace[]            @relation("WorkspaceOwner")
+  memberships         WorkspaceMember[]
+  submittedReviews    ReviewRequest[]        @relation("ReviewSubmittedBy")
+  reviewedReviews     ReviewRequest[]        @relation("ReviewReviewedBy")
+  dispatchedWorkflows MaintenanceWorkflow[]
 
   @@map("users")
 }
@@ -108,8 +127,10 @@ model Site {
   createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  githubInstallation GitHubInstallation @relation(fields: [githubInstallationId], references: [id])
+  workspace             Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  githubInstallation    GitHubInstallation     @relation(fields: [githubInstallationId], references: [id])
+  reviewRequests        ReviewRequest[]
+  maintenanceWorkflow   MaintenanceWorkflow?
 
   @@unique([workspaceId, slug])
   @@unique([githubRepoOwner, githubRepoName])
@@ -129,4 +150,40 @@ model HostConnection {
 
   @@unique([workspaceId, provider])
   @@map("host_connections")
+}
+
+model ReviewRequest {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  siteId         String       @map("site_id") @db.Uuid
+  kind           ReviewKind
+  source         ReviewSource
+  path           String?      @db.VarChar(500)
+  githubPrNumber Int?         @map("github_pr_number")
+  branch         String?      @db.VarChar(200)
+  submittedById  String?      @map("submitted_by") @db.Uuid
+  status         ReviewStatus @default(pending)
+  reviewedById   String?      @map("reviewed_by") @db.Uuid
+  reviewerNote   String?      @map("reviewer_note")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  site        Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  submittedBy User? @relation("ReviewSubmittedBy", fields: [submittedById], references: [id])
+  reviewedBy  User? @relation("ReviewReviewedBy", fields: [reviewedById], references: [id])
+
+  @@unique([siteId, githubPrNumber])
+  @@map("review_requests")
+}
+
+model MaintenanceWorkflow {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  siteId             String    @unique @map("site_id") @db.Uuid
+  workflowFile       String    @default(".github/workflows/NextFlow-maintenance.yml") @map("workflow_file") @db.VarChar(200)
+  lastDispatchedAt   DateTime? @map("last_dispatched_at") @db.Timestamptz(6)
+  lastDispatchedById String?   @map("last_dispatched_by") @db.Uuid
+
+  site             Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  lastDispatchedBy User? @relation(fields: [lastDispatchedById], references: [id])
+
+  @@map("maintenance_workflows")
 }
