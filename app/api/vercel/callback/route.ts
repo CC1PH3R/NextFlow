@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import {
   VERCEL_OAUTH_STATE_COOKIE,
   exchangeVercelCode,
+  vercelRedirectUri,
   saveVercelConnection,
 } from "@/lib/hosts/vercel";
 import { prisma } from "@/lib/prisma";
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       redirect("/dashboard");
     }
 
-    const tokens = await exchangeVercelCode(code);
+    const tokens = await exchangeVercelCode(code, vercelRedirectUri(url.origin));
     const configurationId =
       tokens.configurationId ??
       nonempty(url.searchParams.get("configurationId"));

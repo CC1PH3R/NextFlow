@@ -68,7 +68,9 @@ Create a **GitHub App** once at [github.com/settings/apps/new](https://github.co
 | Callback URL | `http://localhost:3000/api/github/setup` |
 | Setup URL | `http://localhost:3000/api/github/setup` |
 | Redirect on update | on |
-| Webhook | inactive |
+| Webhook URL | `https://<this-deployment>/api/github/webhook` |
+| Webhook secret | `GITHUB_WEBHOOK_SECRET` (not `AUTH_SECRET` or `TOKEN_ENCRYPTION_KEY`) |
+| Webhook events | `pull_request` only, until milestone 15 |
 | Repository permissions | see the list below |
 | Organization / account permissions | none |
 | Install | Only on this account |
@@ -91,6 +93,7 @@ Env:
 - `GITHUB_APP_ID`
 - `GITHUB_APP_SLUG` (URL slug, lowercased when we build the install URL)
 - `GITHUB_APP_PRIVATE_KEY` — **one quoted line** with `\n` between PEM lines
+- `GITHUB_WEBHOOK_SECRET` — HMAC material for `/api/github/webhook`. Generate with `openssl rand -base64 32`.
 
 ```
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
@@ -106,7 +109,7 @@ Create an **Integration** at [vercel.com/dashboard/integrations/console](https:/
 
 | Field | Local value |
 | --- | --- |
-| Redirect URL | `http://localhost:3000/api/vercel/callback` |
+| Redirect URL | `http://localhost:3000/api/vercel/callback` and `https://<this-deployment>/api/vercel/callback` |
 | API scopes | **Project** read, **Deployment** read |
 | Webhook URL | empty |
 

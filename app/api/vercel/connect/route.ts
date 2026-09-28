@@ -10,7 +10,7 @@ import {
 } from "@/lib/hosts/vercel";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   if (!session?.userId) {
     redirect("/");
@@ -36,7 +36,7 @@ export async function GET() {
     sameSite: "lax",
     path: "/",
     maxAge: 10 * 60,
-    secure: false,
+    secure: new URL(request.url).protocol === "https:",
   });
 
   redirect(vercelInstallUrl(state));

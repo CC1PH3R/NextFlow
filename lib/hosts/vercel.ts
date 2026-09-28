@@ -5,8 +5,11 @@ import { decrypt, encrypt, parseTokenEncryptionKey } from "@/lib/crypto/token";
 import { prisma } from "@/lib/prisma";
 import type { HostAdapter, HostProduction, HostProject } from "@/lib/hosts/types";
 
-const VERCEL_REDIRECT_URI = "http://localhost:3000/api/vercel/callback";
 const VERCEL_API = "https://api.vercel.com";
+
+export function vercelRedirectUri(origin: string) {
+  return `${origin}/api/vercel/callback`;
+}
 
 export const VERCEL_OAUTH_STATE_COOKIE = "nextflow-vercel-oauth-state";
 
@@ -37,7 +40,7 @@ type VercelTokenResponse = {
   installation_id?: unknown;
 };
 
-export async function exchangeVercelCode(code: string) {
+export async function exchangeVercelCode(code: string, redirectUri: string) {
   if (!env.VERCEL_CLIENT_ID || !env.VERCEL_CLIENT_SECRET) {
     throw new Error("Vercel OAuth is not configured.");
   }
@@ -46,7 +49,7 @@ export async function exchangeVercelCode(code: string) {
     client_id: env.VERCEL_CLIENT_ID,
     client_secret: env.VERCEL_CLIENT_SECRET,
     code,
-    redirect_uri: VERCEL_REDIRECT_URI,
+    redirect_uri: redirectUri,
   });
 
   const response = await fetch(`${VERCEL_API}/v2/oauth/access_token`, {
